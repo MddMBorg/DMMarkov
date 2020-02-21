@@ -30,7 +30,7 @@ namespace Markov
             {
                 conn.Open();
                 var comm = conn.CreateCommand();
-                comm.CommandText = "SELECT IFNULL(MAX(DATETIME('Date')), DATETIME('2020-01-01 01:00:00.000')) FROM Headlines";
+                comm.CommandText = "SELECT IFNULL(MAX(DATETIME(Date)), DATETIME('2020-01-01 01:00:00.000')) FROM Headlines";
                 maxDateTime = DateTime.Parse(comm.ExecuteScalar() as string);
             }
 
@@ -43,13 +43,15 @@ namespace Markov
                 {
                     {"Headline", item.Headline},
                     {"GUID", item.GUID},
-                    {"Date", item.Date.ToString("yyyy-MM-dd hh:mm:ss.fff")}
+                    {"Date", item.Date.ToString("yyyy-MM-dd HH:mm:ss.fff")}
                 });
             }
 
             SQLiteWrapper.InsertRecords("Headlines", colVals);
 
             Console.WriteLine("Finished updating headline list");
+
+            ParseHelper.GetWords();
         }
 
         static async Task<List<XElement>> GetFeed()
