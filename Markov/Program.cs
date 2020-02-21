@@ -14,9 +14,8 @@ namespace Markov
         {
             SQLiteWrapper.CheckDatabase();
 
-            var xEl = GetFeed().Result;
-            var nS = xEl.GetDefaultNamespace();
-            var l = xEl.Element(nS + "channel").Elements(nS + "item");
+            var l = GetFeed().Result;
+            var nS = l[0].GetDefaultNamespace();
             var items = l.Select(x => new
             {
                 Headline = x.Element(nS + "title").Value,
@@ -36,31 +35,47 @@ namespace Markov
             }
 
             List<Dictionary<string, string>> colVals = new List<Dictionary<string, string>>();
-            foreach (var item in items)
+
+            //foreach distinct guid where it's newer than most recent record
+            foreach (var item in items.GroupBy(x => x.GUID).Select(x => x.First()).Where(x => DateTime.Compare(maxDateTime, x.Date) < 0).ToList())
             {
-                if (DateTime.Compare(maxDateTime, item.Date) < 0)
+                colVals.Add(new Dictionary<string, string>()
                 {
-                    colVals.Add(new Dictionary<string, string>()
-                    {
-                        {"Headline", item.Headline},
-                        {"GUID", item.GUID},
-                        {"Date", item.Date.ToString("yyyy-MM-dd hh:mm:ss.fff")}
-                    });
-                }
+                    {"Headline", item.Headline},
+                    {"GUID", item.GUID},
+                    {"Date", item.Date.ToString("yyyy-MM-dd hh:mm:ss.fff")}
+                });
             }
 
             SQLiteWrapper.InsertRecords("Headlines", colVals);
+
+            Console.WriteLine("Finished updating headline list");
         }
 
-        static async Task<XElement> GetFeed()
+        static async Task<List<XElement>> GetFeed()
         {
+            List<string> endpoints = new List<string>()
+            {
+                "articles.rss", "home/index.rss", "news/index.rss", "health/index.rss", "sciencetech/index.rss",
+                "news/articles.rss"
+            };
+
+            List<XElement> elements = new List<XElement>();
+
             using (HttpClient client = new HttpClient())
             {
                 client.BaseAddress = new Uri("https://www.dailymail.co.uk/");
-                HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Get, "articles.rss");
-                var resp = await client.SendAsync(req);
-                return XElement.Parse(await resp.Content.ReadAsStringAsync());
+                foreach (var end in endpoints)
+                {
+                    HttpRequestMessage req = new HttpRequestMessage(HttpMethod.Get, end);
+                    var resp = await client.SendAsync(req);
+                    var el = XElement.Parse(await resp.Content.ReadAsStringAsync());
+                    var nS = el.GetDefaultNamespace();
+                    elements.AddRange(el.Element(nS + "channel").Elements(nS + "item"));
+                }
             }
+
+            return elements;
         }
 
 
