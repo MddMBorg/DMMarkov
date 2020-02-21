@@ -12,6 +12,7 @@ nupkg/
 .idea
 
 # User-specific files
+*.db
 *.suo
 *.user
 *.userosscache
