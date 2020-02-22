@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Data.SQLite;
 using System.Linq;
 using System.Net.Http;
@@ -43,14 +44,15 @@ namespace Markov
                 {
                     {"Headline", item.Headline},
                     {"GUID", item.GUID},
-                    {"Date", item.Date.ToString("yyyy-MM-dd HH:mm:ss.fff")}
+                    {"Date", item.Date.ToString("yyyy-MM-dd HH:mm:ss.fff")},
+                    {"Sanitised Headline", ParseHelper.SanitiseHeadline(item.Headline)}
                 });
             }
 
             SQLiteWrapper.InsertRecords("Headlines", colVals);
 
             Console.WriteLine("Finished updating headline list");
-
+_UpdateHeadlines();
             ParseHelper.GetWords();
         }
 
@@ -80,6 +82,30 @@ namespace Markov
             return elements;
         }
 
+        //Workaround for existing data
+        static void _UpdateHeadlines()
+        {
+            using (var conn = new SQLiteConnection("Data Source=DMHeadlines.db"))
+            {
+                conn.Open();
+                var comm = conn.CreateCommand();
+
+                comm.CommandText = "SELECT Headline FROM Headlines";
+                DataTable dT = new DataTable();
+                dT.Load(comm.ExecuteReader());
+
+                Dictionary<string, string> keys = new Dictionary<string, string>(){{"Headline", ""}};
+                Dictionary<string, string> fields = new Dictionary<string, string>(){{"Sanitised Headline", ""}};
+
+                foreach (var row in dT.AsEnumerable())
+                {
+                    var head = row[0] as string;
+                    keys["Headline"] = head;
+                    fields["Sanitised Headline"] = ParseHelper.SanitiseHeadline(head);
+                    SQLiteWrapper.UpdateRecord(conn, "Headlines", keys, fields);
+                }
+            }
+        }
 
     }
 

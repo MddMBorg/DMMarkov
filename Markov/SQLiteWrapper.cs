@@ -17,9 +17,10 @@ namespace Markov
                 var comm = conn.CreateCommand();
                 comm.CommandText = @"CREATE TABLE IF NOT EXISTS Headlines
                 (
-                    Headline    TEXT NOT NULL,
-                    GUID        TEXT PRIMARY KEY,
-                    Date        TEXT NOT NULL
+                    Headline                TEXT NOT NULL,
+                    `Sanitised Headline`  TEXT NOT NULL,
+                    GUID                    TEXT PRIMARY KEY,
+                    Date                    TEXT NOT NULL
                 )";
                 comm.ExecuteNonQuery();
 
@@ -28,6 +29,7 @@ namespace Markov
                     Word            NOT NULL,
                     Subsequent      NOT NULL,
                     Probability     FLOAT NOT NULL,
+                    PSharedSentence FLOAT NOT NULL,
                     PRIMARY KEY (Word, Subsequent)
                 )";
                 comm.ExecuteNonQuery();
@@ -40,12 +42,12 @@ namespace Markov
                 conn.Open();
 
             var comm = conn.CreateCommand();
-            string varString = string.Join(", ", columnVals.Select(x => $"${x.Key}"));
-            string colString = string.Join(", ", columnVals.Select(x => $"{x.Key}"));
+            string varString = string.Join(", ", columnVals.Select(x => $"${x.Key.Replace(" ", "")}"));
+            string colString = string.Join(", ", columnVals.Select(x => $"`{x.Key}`"));
             comm.CommandText = $"INSERT INTO {table} ({colString}) VALUES ({varString})";
             foreach (var pair in columnVals)
             {
-                comm.Parameters.AddWithValue($"${pair.Key}", pair.Value);
+                comm.Parameters.AddWithValue($"${pair.Key.Replace(" ", "")}", pair.Value);
             }
             try
             {
@@ -70,6 +72,25 @@ namespace Markov
                 conn.Open();
                 InsertRecords(conn, table, columnVals);
             }
+        }
+
+        public static void UpdateRecord(SQLiteConnection conn, string table, Dictionary<string, string> keys, Dictionary<string, string> updateFields)
+        {
+            if (conn.State != ConnectionState.Open)
+                conn.Open();
+
+            var comm = conn.CreateCommand();
+            string updateStr = string.Join(", ", updateFields.Select(x => $"`{x.Key}` = ${x.Key.Replace(" ", "")}"));
+            string predStr = string.Join(" AND ", keys.Select(x => $"`{x.Key}` = ${x.Key.Replace(" ", "")}"));
+
+            comm.CommandText = $"UPDATE {table} SET {updateStr} WHERE {predStr}";
+            foreach(var k in keys)
+                comm.Parameters.AddWithValue($"${k.Key.Replace(" ", "")}", k.Value);
+
+            foreach(var u in updateFields)
+                comm.Parameters.AddWithValue($"${u.Key.Replace(" ", "")}", u.Value);
+
+            comm.ExecuteNonQuery();
         }
 
     }
