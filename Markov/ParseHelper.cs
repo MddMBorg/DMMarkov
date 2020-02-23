@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Data.SQLite;
 using System.Linq;
 using System.Threading.Tasks;
@@ -8,24 +10,35 @@ namespace Markov
     public class ParseHelper
     {
         private static readonly List<char> _Currencies = new List<char>() { '$', '€', '£' };
-        private static readonly char[] _TrimChars = new char[]{'\'', '.', '-'};
+        private static readonly char[] _TrimChars = new char[] { '\'', '.', '-' };
 
         private class Relation
         {
             public string Base;
             public string Next;
             public int Count = 0;
-            public int ShareSentence = 0;
+            public double Probability = 0;
         }
 
-        public static async void GetWords()
+        private class Relation2
+        {
+            public string Base;
+            public string Base2;
+            public string Next;
+            public int Count = 0;
+            public double Probability = 0;
+        }
+
+        public static async void CalculateWordRelations()
         {
             var heads = await _RetrieveHeadlines();
 
             List<Relation> links = new List<Relation>();
+            List<Relation2> links2 = new List<Relation2>();
 
             List<string> words = new List<string>();
 
+            string prev = "";
             string curr = "";
             string next = "";
             foreach (var head in heads)
@@ -43,17 +56,33 @@ namespace Markov
                     else
                         links.Add(new Relation() { Base = curr, Next = next, Count = 1 });
 
-                    for (int j = i + 1; j < total; j++)
+                    if (i > 0)
                     {
-                        next = wordList[j];
-                        t = links.FirstOrDefault(x => x.Base == curr && x.Next == next);
-                        if (t != null)
-                            t.ShareSentence++;
+                        prev = wordList[i - 1];
+
+                        var t2 = links2.FirstOrDefault(x => x.Base == prev && x.Base2 == curr && x.Next == next);
+                        if (t2 != null)
+                            t2.Count++;
                         else
-                            links.Add(new Relation() { Base = curr, Next = next, ShareSentence = 1 });
+                            links2.Add(new Relation2() { Base = prev, Base2 = curr, Next = next, Count = 1 });
                     }
                 }
             }
+
+            foreach (var g in links.GroupBy(x => x.Base))
+            {
+                foreach (var i in g)
+                    i.Probability = (double)i.Count / g.Sum(x => x.Count);
+            }
+
+            foreach (var g in links2.GroupBy(x => new { x.Base, x.Base2 }))
+            {
+                foreach (var i in g)
+                    i.Probability = (double)i.Count / g.Sum(x => x.Count);
+            }
+
+            _UpdateLinks1(links);
+            _UpdateLinks2(links2);
         }
 
         static async Task<List<string>> _RetrieveHeadlines()
@@ -63,7 +92,7 @@ namespace Markov
             {
                 conn.Open();
                 var comm = conn.CreateCommand();
-                comm.CommandText = "SELECT Headline FROM Headlines";
+                comm.CommandText = "SELECT `Sanitised Headline` FROM Headlines";
                 var reader = await comm.ExecuteReaderAsync();
                 while (reader.Read())
                 {
@@ -117,7 +146,7 @@ namespace Markov
                         yRet = "";
                         parsingNumber = true;
                     }
-                    yRet += '`';
+                    yRet += '_';
                 }
                 else if (parsingNumber)
                 {
@@ -137,6 +166,72 @@ namespace Markov
                 i++;
             }
             yield return yRet;
+        }
+
+
+        static void _UpdateLinks1(List<Relation> links)
+        {
+            //batch insert to significantly decrease time c. 100x with max 1000 parameters, or even further if using non-parameters (unsafe)
+            using (var conn = new SQLiteConnection("Data Source=DMHeadlines.db"))
+            {
+                conn.Open();
+                var comm = conn.CreateCommand();
+                string valStr = "";
+
+                for (int i = 0; i <= links.Count / 300; i++)
+                {
+                    valStr = "";
+                    comm.Parameters.Clear();
+                    int max = Math.Min(links.Count - i * 300, 300);
+
+                    for (int j = 0; j < max; j++)
+                    {
+                        var l = links[i * 300 + j];
+                        valStr += $"($W{j}, $S{j}, $P{j}),";
+                        comm.Parameters.AddWithValue($"$W{j}", l.Base);
+                        comm.Parameters.AddWithValue($"$S{j}", l.Next);
+                        comm.Parameters.AddWithValue($"$P{j}", l.Probability);
+                    }
+                    valStr = valStr.Trim(',');
+                    comm.CommandText = $@"INSERT OR REPLACE INTO MarkovProbabilities(Word, Subsequent, Probability)
+                                        VALUES {valStr};";
+
+                    comm.ExecuteNonQuery();
+                }
+            }
+        }
+
+        static void _UpdateLinks2(List<Relation2> links)
+        {
+            //batch insert to significantly decrease time c. 100x with max 1000 parameters, or even further if using non-parameters (unsafe)
+            using (var conn = new SQLiteConnection("Data Source=DMHeadlines.db"))
+            {
+                conn.Open();
+                var comm = conn.CreateCommand();
+                string valStr = "";
+
+                for (int i = 0; i <= links.Count / 220; i++)
+                {
+                    valStr = "";
+                    comm.Parameters.Clear();
+                    int max = Math.Min(links.Count - i * 220, 220);
+
+                    for (int j = 0; j < max; j++)
+                    {
+                        var l = links[i * 220 + j];
+                        valStr += $"($W{j}, $2W{j}, $S{j}, $P{j}),";
+                        comm.Parameters.AddWithValue($"$W{j}", l.Base);
+                        comm.Parameters.AddWithValue($"$2W{j}", l.Base2);
+                        comm.Parameters.AddWithValue($"$S{j}", l.Next);
+                        comm.Parameters.AddWithValue($"$P{j}", l.Probability);
+                    }
+                    valStr = valStr.Trim(',');
+                    comm.CommandText = $@"INSERT OR REPLACE INTO Markov2Probabilities(Word1, Word2, Subsequent, Probability)
+                                        VALUES {valStr};";
+
+                    comm.ExecuteNonQuery();
+                }
+            }
         }
 
     }

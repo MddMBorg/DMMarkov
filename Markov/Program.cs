@@ -15,6 +15,8 @@ namespace Markov
         {
             SQLiteWrapper.CheckDatabase();
 
+            Console.WriteLine("Retrieving feeds...");
+
             var l = GetFeed().Result;
             var nS = l[0].GetDefaultNamespace();
             var items = l.Select(x => new
@@ -24,6 +26,8 @@ namespace Markov
                 Date = DateTime.Parse(x.Element(nS + "pubDate").Value)
             })
                 .ToList();
+
+            Console.WriteLine("Got Feeds");
 
             DateTime maxDateTime;
 
@@ -52,8 +56,11 @@ namespace Markov
             SQLiteWrapper.InsertRecords("Headlines", colVals);
 
             Console.WriteLine("Finished updating headline list");
-_UpdateHeadlines();
-            ParseHelper.GetWords();
+            Console.WriteLine("Calculating word relations...");
+
+            ParseHelper.CalculateWordRelations();
+
+            Console.WriteLine("Word relations calculated!");
         }
 
         static async Task<List<XElement>> GetFeed()

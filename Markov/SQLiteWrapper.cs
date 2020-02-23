@@ -29,8 +29,17 @@ namespace Markov
                     Word            NOT NULL,
                     Subsequent      NOT NULL,
                     Probability     FLOAT NOT NULL,
-                    PSharedSentence FLOAT NOT NULL,
                     PRIMARY KEY (Word, Subsequent)
+                )";
+                comm.ExecuteNonQuery();
+                
+                comm.CommandText = @"CREATE TABLE IF NOT EXISTS Markov2Probabilities
+                (
+                    Word1           NOT NULL,
+                    Word2           NOT NULL,
+                    Subsequent      NOT NULL,
+                    Probability     FLOAT NOT NULL,
+                    PRIMARY KEY (Word1, Word2, Subsequent)
                 )";
                 comm.ExecuteNonQuery();
             }
