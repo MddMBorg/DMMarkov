@@ -12,29 +12,12 @@ namespace Markov
         private static readonly List<char> _Currencies = new List<char>() { '$', '€', '£' };
         private static readonly char[] _TrimChars = new char[] { '\'', '.', '-' };
 
-        private class Relation
-        {
-            public string Base;
-            public string Next;
-            public int Count = 0;
-            public double Probability = 0;
-        }
-
-        private class Relation2
-        {
-            public string Base;
-            public string Base2;
-            public string Next;
-            public int Count = 0;
-            public double Probability = 0;
-        }
-
         public static async void CalculateWordRelations()
         {
             var heads = await _RetrieveHeadlines();
 
-            List<Relation> links = new List<Relation>();
-            List<Relation2> links2 = new List<Relation2>();
+            List<FOMarkov> links = new List<FOMarkov>();
+            List<SOMarkov> links2 = new List<SOMarkov>();
 
             List<string> words = new List<string>();
 
@@ -54,7 +37,7 @@ namespace Markov
                     if (t != null)
                         t.Count++;
                     else
-                        links.Add(new Relation() { Base = curr, Next = next, Count = 1 });
+                        links.Add(new FOMarkov() { Base = curr, Next = next, Count = 1 });
 
                     if (i > 0)
                     {
@@ -64,7 +47,7 @@ namespace Markov
                         if (t2 != null)
                             t2.Count++;
                         else
-                            links2.Add(new Relation2() { Base = prev, Base2 = curr, Next = next, Count = 1 });
+                            links2.Add(new SOMarkov() { Base = prev, Base2 = curr, Next = next, Count = 1 });
                     }
                 }
             }
@@ -169,7 +152,7 @@ namespace Markov
         }
 
 
-        static void _UpdateLinks1(List<Relation> links)
+        static void _UpdateLinks1(List<FOMarkov> links)
         {
             //batch insert to significantly decrease time c. 100x with max 1000 parameters, or even further if using non-parameters (unsafe)
             using (var conn = new SQLiteConnection("Data Source=DMHeadlines.db"))
@@ -178,7 +161,7 @@ namespace Markov
                 var comm = conn.CreateCommand();
                 string valStr = "";
 
-                for (int i = 0; i <= links.Count / 300; i++)
+                for (int i = 0; i <= (links.Count - 1) / 300; i++)
                 {
                     valStr = "";
                     comm.Parameters.Clear();
@@ -201,7 +184,7 @@ namespace Markov
             }
         }
 
-        static void _UpdateLinks2(List<Relation2> links)
+        static void _UpdateLinks2(List<SOMarkov> links)
         {
             //batch insert to significantly decrease time c. 100x with max 1000 parameters, or even further if using non-parameters (unsafe)
             using (var conn = new SQLiteConnection("Data Source=DMHeadlines.db"))

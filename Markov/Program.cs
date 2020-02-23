@@ -61,6 +61,9 @@ namespace Markov
             ParseHelper.CalculateWordRelations();
 
             Console.WriteLine("Word relations calculated!");
+            Console.WriteLine("Generating sentence...");
+
+            SpoolSentence.GenerateSentence();
         }
 
         static async Task<List<XElement>> GetFeed()
@@ -87,31 +90,6 @@ namespace Markov
             }
 
             return elements;
-        }
-
-        //Workaround for existing data
-        static void _UpdateHeadlines()
-        {
-            using (var conn = new SQLiteConnection("Data Source=DMHeadlines.db"))
-            {
-                conn.Open();
-                var comm = conn.CreateCommand();
-
-                comm.CommandText = "SELECT Headline FROM Headlines";
-                DataTable dT = new DataTable();
-                dT.Load(comm.ExecuteReader());
-
-                Dictionary<string, string> keys = new Dictionary<string, string>(){{"Headline", ""}};
-                Dictionary<string, string> fields = new Dictionary<string, string>(){{"Sanitised Headline", ""}};
-
-                foreach (var row in dT.AsEnumerable())
-                {
-                    var head = row[0] as string;
-                    keys["Headline"] = head;
-                    fields["Sanitised Headline"] = ParseHelper.SanitiseHeadline(head);
-                    SQLiteWrapper.UpdateRecord(conn, "Headlines", keys, fields);
-                }
-            }
         }
 
     }
