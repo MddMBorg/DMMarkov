@@ -15,6 +15,8 @@ namespace Markov
         {
             SQLiteWrapper.CheckDatabase();
 
+            SpoolSentence.GenerateSentence();
+
             Console.WriteLine("Retrieving feeds...");
 
             var l = GetFeed().Result;
@@ -71,7 +73,7 @@ namespace Markov
             List<string> endpoints = new List<string>()
             {
                 "articles.rss", "home/index.rss", "news/index.rss", "health/index.rss", "sciencetech/index.rss",
-                "news/articles.rss"
+                "news/articles.rss", "ushome/index.rss"
             };
 
             List<XElement> elements = new List<XElement>();

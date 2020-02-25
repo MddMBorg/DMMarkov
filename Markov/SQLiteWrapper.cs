@@ -53,7 +53,7 @@ namespace Markov
             var comm = conn.CreateCommand();
             string varString = string.Join(", ", columnVals.Select(x => $"${x.Key.Replace(" ", "")}"));
             string colString = string.Join(", ", columnVals.Select(x => $"`{x.Key}`"));
-            comm.CommandText = $"INSERT INTO {table} ({colString}) VALUES ({varString})";
+            comm.CommandText = $"INSERT OR REPLACE INTO {table} ({colString}) VALUES ({varString})";
             foreach (var pair in columnVals)
             {
                 comm.Parameters.AddWithValue($"${pair.Key.Replace(" ", "")}", pair.Value);

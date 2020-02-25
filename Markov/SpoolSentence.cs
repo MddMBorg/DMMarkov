@@ -48,7 +48,7 @@ namespace Markov
 
             string currentword = potSec[rand.Next(potSec.Count)].Base;
             sentence = currentword;
-            potSec = seconds.Where(x => x.Base == currentword).ToList();
+            potSec = seconds.Where(x => x.Base == currentword && x.Probability != 1).ToList();
             string secondWord = potSec[rand.Next(potSec.Count)].Base2;
             sentence += " " + secondWord;
 
