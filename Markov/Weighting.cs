@@ -1,8 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 public static class Weighting
 {
+    public static Dictionary<string, int> WordInstances = new Dictionary<string, int>();
+    public static Dictionary<string, double> RelativeOccurence = new Dictionary<string, double>();
+
     public static double FavourDifferentLengths(string next, params string[] words)
     {
         var avgLen = (double)words.Sum(x => x.Length) / words.Length;
@@ -37,6 +41,31 @@ public static class Weighting
     public static double WeightingSample(string next, params string[] words)
     {
         return FavourTotalUniqueness(next, words) * 0.6 + FavourDifferentLengths(next, words) * 0.3 + FavourAlliteration(next, words) * 0.1;
+    }
+
+    public static double FavourNextPlural(string next, params string[] words) =>
+        next.Last() == 's' ? 1 : 0;
+
+    public static double FavourVowels(string next, params string[] words)
+    {
+        var totString = string.Concat(next, words);
+        return (double)totString.Count(x => "aeiouy".Contains(x)) / totString.Length;
+    }
+
+    public static double FavourConsonants(string next, params string[] words) =>
+        1 - FavourVowels(next, words);
+
+    public static double FavourCommonness(string next, params string[] words) =>
+        (RelativeOccurence[next] + words.Sum(x => RelativeOccurence[x])) / (words.Length + 1);
+
+    public static double FavourRarity(string next, params string[] words) =>
+        1 - FavourCommonness(next, words);
+    
+    public static double FavourAlternatingCommonness(string next, params string[] words)
+    {
+        var nextCommon = FavourCommonness(next, next);
+        var lastCommon = FavourCommonness(words.Last(), words.Last());
+        return Math.Abs(nextCommon - lastCommon);
     }
 
 }

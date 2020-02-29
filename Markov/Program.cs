@@ -15,7 +15,13 @@ namespace Markov
         {
             SQLiteWrapper.CheckDatabase();
 
-            SpoolSentence.GenerateSentence();
+            for(int i = 0; i < 100; i++)
+            {
+                Train.RandomTrain();
+            }
+            return;
+
+            SpoolSentence.GenerateSentence(SpoolSentence.GetFOLinks().ToList(), SpoolSentence.GetSOLinks().ToList());
 
             Console.WriteLine("Retrieving feeds...");
 
@@ -65,7 +71,7 @@ namespace Markov
             Console.WriteLine("Word relations calculated!");
             Console.WriteLine("Generating sentence...");
 
-            SpoolSentence.GenerateSentence();
+            SpoolSentence.GenerateSentence(SpoolSentence.GetFOLinks().ToList(), SpoolSentence.GetSOLinks().ToList());
         }
 
         static async Task<List<XElement>> GetFeed()

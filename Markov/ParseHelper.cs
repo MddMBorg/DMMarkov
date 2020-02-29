@@ -12,60 +12,66 @@ namespace Markov
         private static readonly List<char> _Currencies = new List<char>() { '$', '€', '£' };
         private static readonly char[] _TrimChars = new char[] { '\'', '.', '-' };
 
-        public static async void CalculateWordRelations()
+        public static List<List<string>> GetWordList()
         {
-            var heads = await _RetrieveHeadlines();
+            var heads = _RetrieveHeadlines().Result;
+            return heads.Select(x => x.Split(' ').SelectMany(x => _SanitiseHeadlineWord(x).Where(x => !string.IsNullOrEmpty(x))).ToList()).ToList();
+        }
 
-            List<FOMarkov> links = new List<FOMarkov>();
-            List<SOMarkov> links2 = new List<SOMarkov>();
-
-            List<string> words = new List<string>();
-
+        public static void GetLinks(List<List<string>> words, List<FOMarkov> firstLinks, List<SOMarkov> secondLinks)
+        {
             string prev = "";
             string curr = "";
             string next = "";
-            foreach (var head in heads)
+
+            foreach (var head in words)
             {
-                var wordList = head.Split(' ').SelectMany(x => _SanitiseHeadlineWord(x)).Where(x => !string.IsNullOrEmpty(x)).ToList();
-                int total = wordList.Count();
+                int total = head.Count;
                 for (int i = 0; i < total - 1; i++)
                 {
-                    curr = wordList[i];
-                    next = wordList[i + 1];
+                    curr = head[i];
+                    next = head[i + 1];
 
-                    var t = links.FirstOrDefault(x => x.Base == curr && x.Next == next);
+                    var t = firstLinks.FirstOrDefault(x => x.Base == curr && x.Next == next);
                     if (t != null)
                         t.Count += 1;
                     else
-                        links.Add(new FOMarkov() 
-                        { Base = curr, Next = next,
-                         Weight = 0.3 + 0.6 * Weighting.WeightingSample(next, curr), Count = 1 });
+                        firstLinks.Add(new FOMarkov() 
+                        { Base = curr, Next = next, Count = 1 });
 
                     if (i > 0)
                     {
-                        prev = wordList[i - 1];
+                        prev = head[i - 1];
 
-                        var t2 = links2.FirstOrDefault(x => x.Base == prev && x.Base2 == curr && x.Next == next);
+                        var t2 = secondLinks.FirstOrDefault(x => x.Base == prev && x.Base2 == curr && x.Next == next);
                         if (t2 != null)
                             t2.Count += 1;
                         else
-                            links2.Add(new SOMarkov() 
-                            { Base = prev, Base2 = curr, Next = next,
-                             Weight = 0.3 + 0.6 * Weighting.WeightingSample(next, prev, curr), Count = 1 });
+                            secondLinks.Add(new SOMarkov() 
+                            { Base = prev, Base2 = curr, Next = next, Count = 1 });
                     }
                 }
             }
+        }
+
+        public static async void CalculateWordRelations()
+        {
+            var heads = GetWordList();
+
+            List<FOMarkov> links = new List<FOMarkov>();
+            List<SOMarkov> links2 = new List<SOMarkov>();
+            GetLinks(heads, links, links2);
 
             foreach (var g in links.GroupBy(x => x.Base))
             {
-                var totalP = g.Sum(x => x.Count * x.Weight);
+                var totalP = g.Sum(x => x.Count * 1);
                 foreach (var i in g)
                     i.Probability = (double)i.Count * i.Weight / totalP;
             }
 
             foreach (var g in links2.GroupBy(x => new { x.Base, x.Base2 }))
             {
-                var totalP = g.Sum(x => x.Count * x.Weight);
+                var totalP = g.Sum(x => x.Count * 1);
                 foreach (var i in g)
                     i.Probability = (double)i.Count * i.Weight / totalP;
             }
@@ -157,7 +163,7 @@ namespace Markov
             yield return yRet;
         }
 
-        static void _UpdateLinks1(List<FOMarkov> links)
+        public static void _UpdateLinks1(List<FOMarkov> links)
         {
             //batch insert to significantly decrease time c. 100x with max 1000 parameters, or even further if using non-parameters (unsafe)
             using (var conn = new SQLiteConnection("Data Source=DMHeadlines.db"))
@@ -189,7 +195,7 @@ namespace Markov
             }
         }
 
-        static void _UpdateLinks2(List<SOMarkov> links)
+        public static void _UpdateLinks2(List<SOMarkov> links)
         {
             //batch insert to significantly decrease time c. 100x with max 1000 parameters, or even further if using non-parameters (unsafe)
             using (var conn = new SQLiteConnection("Data Source=DMHeadlines.db"))

@@ -10,10 +10,8 @@ namespace Markov
     public class SpoolSentence
     {
 
-        public static void GenerateSentence()
+        public static void GenerateSentence(List<FOMarkov> firsts, List<SOMarkov> seconds)
         {
-            var firsts = GetFOLinks().ToList();
-            var seconds = GetSOLinks().ToList();
             var rand = new Random();
             string sentence = "";
 
@@ -36,12 +34,11 @@ namespace Markov
                 sentence += " " + new string(currentword.Select(x => x == '_' ? (char)(rand.Next(1, 9) + '0') : x).ToArray());
             }
             Console.WriteLine(sentence);
-            GenerateSentence2();
+            GenerateSentence2(seconds);
         }
 
-        static void GenerateSentence2()
+        static void GenerateSentence2(List<SOMarkov> seconds)
         {
-            var seconds = GetSOLinks().ToList();
             var rand = new Random();
             string sentence = "";
             var potSec = seconds.Where(x => x.Probability != 1).ToList();
@@ -72,7 +69,7 @@ namespace Markov
             Console.WriteLine(sentence);
         }
 
-        static IEnumerable<FOMarkov> GetFOLinks()
+        public static IEnumerable<FOMarkov> GetFOLinks()
         {
             using (var conn = new SQLiteConnection("Data Source=DMHeadlines.db"))
             {
@@ -89,7 +86,7 @@ namespace Markov
             }
         }
 
-        static IEnumerable<SOMarkov> GetSOLinks()
+        public static IEnumerable<SOMarkov> GetSOLinks()
         {
             using (var conn = new SQLiteConnection("Data Source=DMHeadlines.db"))
             {
