@@ -7,6 +7,7 @@ namespace Markov
         public string Next;
         public int Count = 0;
         public double Probability = 0;
+        public double Weight = 0;
     }
 
 }

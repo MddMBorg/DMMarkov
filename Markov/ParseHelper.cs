@@ -35,9 +35,11 @@ namespace Markov
 
                     var t = links.FirstOrDefault(x => x.Base == curr && x.Next == next);
                     if (t != null)
-                        t.Count++;
+                        t.Count += 1;
                     else
-                        links.Add(new FOMarkov() { Base = curr, Next = next, Count = 1 });
+                        links.Add(new FOMarkov() 
+                        { Base = curr, Next = next,
+                         Weight = 0.3 + 0.6 * Weighting.WeightingSample(next, curr), Count = 1 });
 
                     if (i > 0)
                     {
@@ -45,23 +47,27 @@ namespace Markov
 
                         var t2 = links2.FirstOrDefault(x => x.Base == prev && x.Base2 == curr && x.Next == next);
                         if (t2 != null)
-                            t2.Count++;
+                            t2.Count += 1;
                         else
-                            links2.Add(new SOMarkov() { Base = prev, Base2 = curr, Next = next, Count = 1 });
+                            links2.Add(new SOMarkov() 
+                            { Base = prev, Base2 = curr, Next = next,
+                             Weight = 0.3 + 0.6 * Weighting.WeightingSample(next, prev, curr), Count = 1 });
                     }
                 }
             }
 
             foreach (var g in links.GroupBy(x => x.Base))
             {
+                var totalP = g.Sum(x => x.Count * x.Weight);
                 foreach (var i in g)
-                    i.Probability = (double)i.Count / g.Sum(x => x.Count);
+                    i.Probability = (double)i.Count * i.Weight / totalP;
             }
 
             foreach (var g in links2.GroupBy(x => new { x.Base, x.Base2 }))
             {
+                var totalP = g.Sum(x => x.Count * x.Weight);
                 foreach (var i in g)
-                    i.Probability = (double)i.Count / g.Sum(x => x.Count);
+                    i.Probability = (double)i.Count * i.Weight / totalP;
             }
 
             _UpdateLinks1(links);
@@ -150,7 +156,6 @@ namespace Markov
             }
             yield return yRet;
         }
-
 
         static void _UpdateLinks1(List<FOMarkov> links)
         {
