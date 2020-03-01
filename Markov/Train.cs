@@ -6,21 +6,29 @@ namespace Markov
 {
     public class Train
     {
-        delegate double wD(string next, params string[] words);
+        public delegate double wD(string next, params string[] words);
+
+        static Dictionary<FOMarkov, Dictionary<wD, double>> _WeightCache = new Dictionary<FOMarkov, Dictionary<wD, double>>();
+        static Dictionary<SOMarkov, Dictionary<wD, double>> _Weight2Cache = new Dictionary<SOMarkov, Dictionary<wD, double>>();
+
+        public static Dictionary<wD, double> _Funcs = new Dictionary<wD, double>()
+            {
+                { Weighting.FavourAlliteration, 0.5},
+                { Weighting.FavourRarity, 0.5},
+                { Weighting.FavourCommonness, 0.5},
+                { Weighting.FavourAlternatingCommonness, 0.5},
+                { Weighting.FavourDifferentLengths, 0.5},
+                { Weighting.FavourSameLengths, 0.5},
+                { Weighting.FavourNextPlural, 0.5},
+                { Weighting.FavourVowels, 0.5},
+                { Weighting.FavourConsonants, 0.5},
+                { Weighting.FavourTotalSameness, 0.5},
+                { Weighting.FavourTotalUniqueness, 0.5}
+            };
 
         public static void RandomTrain()
         {
-            List<wD> funcs = new List<wD>()
-            {
-                Weighting.FavourAlliteration, Weighting.FavourRarity, Weighting.FavourCommonness,
-                Weighting.FavourAlternatingCommonness, Weighting.FavourDifferentLengths, Weighting.FavourSameLengths,
-                Weighting.FavourNextPlural, Weighting.FavourVowels, Weighting.FavourConsonants,
-                Weighting.FavourTotalSameness, Weighting.FavourTotalUniqueness
-            };
-
             Random rand = new Random();
-
-            var funcBias = funcs.ToDictionary(x => x, x => rand.NextDouble());
 
             var words = ParseHelper.GetWordList();
             Weighting.WordInstances = words.SelectMany(x => x.Select(y => y)).GroupBy(x => x).ToDictionary(x => x.Key, x => x.Count());
@@ -33,47 +41,59 @@ namespace Markov
 
             ParseHelper.GetLinks(words, firsts, seconds);
 
-            foreach (var func in funcBias)
+            foreach (var func in _Funcs.Keys.ToList())
             {
-                Console.WriteLine($"Function {func.Key.Method.Name} at bias {func.Value}");
+                _Funcs[func] = 0;
+            }
+
+            _Funcs[Weighting.FavourAlliteration] = 100;
+            LearnFirstWeights(words, firsts, 0.4);
+            int divisions = words.Count / 50;
+
+            for (int i = 0; i < 50; i++)
+            {
+                var headlineToTest = words[i * divisions + rand.Next(divisions)];
+                Console.WriteLine(GenerateFOSentence(headlineToTest[0], firsts, headlineToTest.Count));
+                //var compWords = (double)headlineToTest.Zip(generated.Split(' ')).Sum(x => x.First == x.Second ? 1 : 0) / headlineToTest.Count;
             }
 
             int mostAccurateFOConfig = 0;
             double mostAccurateFOValue = 0;
-//833, 0.193
+            //833, 0.193
             int mostAccurateSOConfig = 0;
             double mostAccurateSOValue = 0;
-//836, 0.498
-            for (int change = 0; change < 1000; change++)
+            //836, 0.498
+            for (int change = 0; change < 100000; change++)
             {
-                funcBias[Weighting.FavourAlternatingCommonness] = (double)change % 10;
-                funcBias[Weighting.FavourTotalUniqueness] = (double)(change / 10) % 10;
-                funcBias[Weighting.FavourDifferentLengths] = (double)(change / 100) % 10;
+                _Funcs[Weighting.FavourAlternatingCommonness] = (double)change % 10;
+                _Funcs[Weighting.FavourTotalUniqueness] = (double)(change / 10) % 10;
+                _Funcs[Weighting.FavourDifferentLengths] = (double)(change / 100) % 10;
+                _Funcs[Weighting.FavourNextPlural] = (double)(change / 1000) % 10;
+                _Funcs[Weighting.FavourVowels] = (double)(change / 10000) % 10;
 
-                _LearnWeights(words, firsts, seconds, funcBias, 0.4);
+                LearnFirstWeights(words, firsts, 0.4);
 
                 double avgFOaccuracy = 0;
-                int divisions = words.Count / 50;
-                for (int i = 0; i < 50; i++)
+                for (int i = 0; i < 20; i++)
                 {
                     var headlineToTest = words[i * divisions + rand.Next(divisions)];
                     var generated = GenerateFOSentence(headlineToTest[0], firsts, headlineToTest.Count);
                     var compWords = (double)headlineToTest.Zip(generated.Split(' ')).Sum(x => x.First == x.Second ? 1 : 0) / headlineToTest.Count;
-                    avgFOaccuracy += compWords / 50;
+                    avgFOaccuracy += compWords / 20;
                 }
 
-                double avgSOaccuracy = 0;
+                /* double avgSOaccuracy = 0;
                 for (int i = 0; i < 50; i++)
                 {
                     var headlineToTest = words[i * divisions + rand.Next(divisions)];
                     var generated = GenerateSOSentence(headlineToTest[0], seconds, headlineToTest.Count);
                     var compWords = (double)headlineToTest.Zip(generated.Split(' ')).Sum(x => x.First == x.Second ? 1 : 0) / headlineToTest.Count;
                     avgSOaccuracy += compWords / 50;
-                }
+                } */
 
                 Console.WriteLine($"Config = {change}");
                 Console.WriteLine($"Average FO accuracy = {avgFOaccuracy}");
-                Console.WriteLine($"Average SO accuracy = {avgSOaccuracy}");
+                //Console.WriteLine($"Average SO accuracy = {avgSOaccuracy}");
 
                 if (avgFOaccuracy > mostAccurateFOValue)
                 {
@@ -81,29 +101,29 @@ namespace Markov
                     mostAccurateFOConfig = change;
                 }
 
-                if (avgSOaccuracy > mostAccurateSOValue)
+                /* if (avgSOaccuracy > mostAccurateSOValue)
                 {
                     mostAccurateSOValue = avgSOaccuracy;
                     mostAccurateSOConfig = change;
-                }
+                } */
             }
 
         }
 
-        static void _LearnWeights(List<List<string>> headlines, List<FOMarkov> firsts, List<SOMarkov> seconds, Dictionary<wD, double> funcBias, double bias)
+        public static void LearnFirstWeights(List<List<string>> headlines, List<FOMarkov> firsts, double bias)
         {
             foreach (var pair in firsts)
             {
-                pair.Weight = bias;
-                foreach (var func in funcBias)
-                    pair.Weight += func.Key(pair.Next, pair.Base) * func.Value;
-            }
-
-            foreach (var trip in seconds)
-            {
-                trip.Weight = bias;
-                foreach (var func in funcBias)
-                    trip.Weight += func.Key(trip.Next, trip.Base, trip.Base2) * func.Value;
+                if (!_WeightCache.ContainsKey(pair))
+                {
+                    var temp = new Dictionary<wD, double>();
+                    foreach (var func in _Funcs)
+                    {
+                        temp[func.Key] = func.Key(pair.Next, pair.Base);
+                    }
+                    _WeightCache[pair] = temp;
+                }
+                pair.Weight = bias + _WeightCache[pair].Sum(x => x.Value * _Funcs[x.Key]);
             }
 
             foreach (var g in firsts.GroupBy(x => x.Base))
@@ -111,6 +131,16 @@ namespace Markov
                 var totalP = g.Sum(x => x.Count * x.Weight);
                 foreach (var i in g)
                     i.Probability = (double)i.Count * i.Weight / totalP;
+            }
+        }
+
+        public static void LearnSecondWeights(List<List<string>> headlines, List<SOMarkov> seconds, double bias)
+        {
+            foreach (var trip in seconds)
+            {
+                trip.Weight = bias;
+                foreach (var func in _Funcs)
+                    trip.Weight += func.Key(trip.Next, trip.Base, trip.Base2) * func.Value;
             }
 
             foreach (var g in seconds.GroupBy(x => new { x.Base, x.Base2 }))
@@ -121,7 +151,13 @@ namespace Markov
             }
         }
 
-        static string GenerateFOSentence(string firstWord, List<FOMarkov> firsts, int maxLength)
+        public static void LearnWeights(List<List<string>> headlines, List<FOMarkov> firsts, List<SOMarkov> seconds, double bias)
+        {
+            LearnFirstWeights(headlines, firsts, bias);
+            LearnSecondWeights(headlines, seconds, bias);
+        }
+
+        public static string GenerateFOSentence(string firstWord, List<FOMarkov> firsts, int maxLength)
         {
             Random rand = new Random();
 
@@ -146,7 +182,7 @@ namespace Markov
             return sentence;
         }
 
-        static string GenerateSOSentence(string firstWord, List<SOMarkov> seconds, int maxLength)
+        public static string GenerateSOSentence(string firstWord, List<SOMarkov> seconds, int maxLength)
         {
             Random rand = new Random();
 
@@ -175,6 +211,9 @@ namespace Markov
             }
             return sentence;
         }
+
+        public static void PrintTrainedSentences(string firstWord, List<FOMarkov> firsts, int maxLength) =>
+            Console.WriteLine(GenerateFOSentence(firstWord, firsts, maxLength));
 
     }
 

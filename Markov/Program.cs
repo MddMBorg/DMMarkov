@@ -15,11 +15,32 @@ namespace Markov
         {
             SQLiteWrapper.CheckDatabase();
 
-            Train.RandomTrain();
-            return;
+            if (args.Length == 0)
+            {
+                Train.RandomTrain();
+                return;
+            }
+            else
+            {
+                SpoolSentence.GenerateSentence(SpoolSentence.GetFOLinks().ToList(), SpoolSentence.GetSOLinks().ToList());
 
-            SpoolSentence.GenerateSentence(SpoolSentence.GetFOLinks().ToList(), SpoolSentence.GetSOLinks().ToList());
+                Console.WriteLine("Updating Feeds...");
+                UpdateFeed().RunSynchronously();
 
+                Console.WriteLine("Finished updating headline list");
+                Console.WriteLine("Calculating word relations...");
+
+                ParseHelper.CalculateWordRelations();
+
+                Console.WriteLine("Word relations calculated!");
+                Console.WriteLine("Generating sentence...");
+
+                SpoolSentence.GenerateSentence(SpoolSentence.GetFOLinks().ToList(), SpoolSentence.GetSOLinks().ToList());
+            }
+        }
+
+        static async Task UpdateFeed()
+        {
             Console.WriteLine("Retrieving feeds...");
 
             var l = GetFeed().Result;
@@ -59,16 +80,6 @@ namespace Markov
             }
 
             SQLiteWrapper.InsertRecords("Headlines", colVals);
-
-            Console.WriteLine("Finished updating headline list");
-            Console.WriteLine("Calculating word relations...");
-
-            ParseHelper.CalculateWordRelations();
-
-            Console.WriteLine("Word relations calculated!");
-            Console.WriteLine("Generating sentence...");
-
-            SpoolSentence.GenerateSentence(SpoolSentence.GetFOLinks().ToList(), SpoolSentence.GetSOLinks().ToList());
         }
 
         static async Task<List<XElement>> GetFeed()

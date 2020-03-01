@@ -9,7 +9,6 @@ namespace Markov
 {
     public class SpoolSentence
     {
-
         public static void GenerateSentence(List<FOMarkov> firsts, List<SOMarkov> seconds)
         {
             var rand = new Random();
