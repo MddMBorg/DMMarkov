@@ -15,10 +15,7 @@ namespace Markov
         {
             SQLiteWrapper.CheckDatabase();
 
-            for(int i = 0; i < 100; i++)
-            {
-                Train.RandomTrain();
-            }
+            Train.RandomTrain();
             return;
 
             SpoolSentence.GenerateSentence(SpoolSentence.GetFOLinks().ToList(), SpoolSentence.GetSOLinks().ToList());
