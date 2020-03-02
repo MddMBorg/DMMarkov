@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="ILGPU" Version="0.7.1" />
     <PackageReference Include="System.Data.SQLite.Core" Version="1.0.112.0" />
   </ItemGroup>
 
