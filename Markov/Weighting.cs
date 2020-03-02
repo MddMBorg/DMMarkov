@@ -30,7 +30,7 @@ public static class Weighting
     {
         double ret = 0;
         ret += (next[0] == words.Last()[0]) ? 0.7 : 0;
-        if (words.Last().Length > 2 && next.Length > 2)
+        if (words.Last().Length > 2 && next.Length > 2 && ret == 0.7)
         {
             ret += (next[1] == words.Last()[1]) ? 0.2 : 0;
             ret += (next[2] == words.Last()[2]) ? 0.1 : 0;

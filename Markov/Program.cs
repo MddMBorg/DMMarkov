@@ -13,8 +13,8 @@ namespace Markov
     {
         static void Main(string[] args)
         {
-            SQLiteWrapper.CheckDatabase();
-
+            //SQLiteWrapper.CheckDatabase();
+            //Console.Write(System.IO.Directory.GetCurrentDirectory());
             if (args.Length == 0)
             {
                 Train.RandomTrain();
@@ -25,7 +25,7 @@ namespace Markov
                 SpoolSentence.GenerateSentence(SpoolSentence.GetFOLinks().ToList(), SpoolSentence.GetSOLinks().ToList());
 
                 Console.WriteLine("Updating Feeds...");
-                UpdateFeed().RunSynchronously();
+                UpdateFeed().Wait();
 
                 Console.WriteLine("Finished updating headline list");
                 Console.WriteLine("Calculating word relations...");

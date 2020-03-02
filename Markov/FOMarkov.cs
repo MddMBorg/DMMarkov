@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+
 namespace Markov
 {
     public class FOMarkov
@@ -7,6 +10,8 @@ namespace Markov
         public int Count = 0;
         public double Probability = 0;
         public double Weight = 0;
+        public List<double> Weights = new List<double>();
+
     }
 
 }

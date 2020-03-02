@@ -8,22 +8,21 @@ namespace Markov
     {
         public delegate double wD(string next, params string[] words);
 
-        static Dictionary<FOMarkov, Dictionary<wD, double>> _WeightCache = new Dictionary<FOMarkov, Dictionary<wD, double>>();
-        static Dictionary<SOMarkov, Dictionary<wD, double>> _Weight2Cache = new Dictionary<SOMarkov, Dictionary<wD, double>>();
+        private static bool _FirstWeightsCalculated = false;
 
         public static Dictionary<wD, double> _Funcs = new Dictionary<wD, double>()
             {
-                { Weighting.FavourAlliteration, 0.5},
-                { Weighting.FavourRarity, 0.5},
-                { Weighting.FavourCommonness, 0.5},
-                { Weighting.FavourAlternatingCommonness, 0.5},
-                { Weighting.FavourDifferentLengths, 0.5},
-                { Weighting.FavourSameLengths, 0.5},
-                { Weighting.FavourNextPlural, 0.5},
-                { Weighting.FavourVowels, 0.5},
-                { Weighting.FavourConsonants, 0.5},
-                { Weighting.FavourTotalSameness, 0.5},
-                { Weighting.FavourTotalUniqueness, 0.5}
+                { Weighting.FavourAlliteration, 0.3},
+                { Weighting.FavourRarity, 0.3},
+                { Weighting.FavourCommonness, 0.3},
+                { Weighting.FavourAlternatingCommonness, 0.3},
+                { Weighting.FavourDifferentLengths, 0.3},
+                { Weighting.FavourSameLengths, 0.3},
+                { Weighting.FavourNextPlural, 0.3},
+                { Weighting.FavourVowels, 0.3},
+                { Weighting.FavourConsonants, 0.3},
+                { Weighting.FavourTotalSameness, 0.3},
+                { Weighting.FavourTotalUniqueness, 0.3}
             };
 
         public static void RandomTrain()
@@ -41,21 +40,9 @@ namespace Markov
 
             ParseHelper.GetLinks(words, firsts, seconds);
 
-            foreach (var func in _Funcs.Keys.ToList())
-            {
-                _Funcs[func] = 0;
-            }
-
-            _Funcs[Weighting.FavourAlliteration] = 100;
-            LearnFirstWeights(words, firsts, 0.4);
+            var sortedFirsts = new SortedList<string, List<FOMarkov>>(firsts.GroupBy(x => x.Base).ToDictionary(x => x.Key, x => x.ToList()));
             int divisions = words.Count / 50;
-
-            for (int i = 0; i < 50; i++)
-            {
-                var headlineToTest = words[i * divisions + rand.Next(divisions)];
-                Console.WriteLine(GenerateFOSentence(headlineToTest[0], firsts, headlineToTest.Count));
-                //var compWords = (double)headlineToTest.Zip(generated.Split(' ')).Sum(x => x.First == x.Second ? 1 : 0) / headlineToTest.Count;
-            }
+            DateTime start = DateTime.Now;
 
             int mostAccurateFOConfig = 0;
             double mostAccurateFOValue = 0;
@@ -71,66 +58,76 @@ namespace Markov
                 _Funcs[Weighting.FavourNextPlural] = (double)(change / 1000) % 10;
                 _Funcs[Weighting.FavourVowels] = (double)(change / 10000) % 10;
 
-                LearnFirstWeights(words, firsts, 0.4);
+                LearnFirstWeights(sortedFirsts, firsts, 0.4);
 
                 double avgFOaccuracy = 0;
                 for (int i = 0; i < 20; i++)
                 {
                     var headlineToTest = words[i * divisions + rand.Next(divisions)];
-                    var generated = GenerateFOSentence(headlineToTest[0], firsts, headlineToTest.Count);
+                    var generated = GenerateFOSentence(headlineToTest[0], sortedFirsts, headlineToTest.Count);
                     var compWords = (double)headlineToTest.Zip(generated.Split(' ')).Sum(x => x.First == x.Second ? 1 : 0) / headlineToTest.Count;
                     avgFOaccuracy += compWords / 20;
                 }
 
-                /* double avgSOaccuracy = 0;
-                for (int i = 0; i < 50; i++)
+                if (change % 50 == 0)
                 {
-                    var headlineToTest = words[i * divisions + rand.Next(divisions)];
-                    var generated = GenerateSOSentence(headlineToTest[0], seconds, headlineToTest.Count);
-                    var compWords = (double)headlineToTest.Zip(generated.Split(' ')).Sum(x => x.First == x.Second ? 1 : 0) / headlineToTest.Count;
-                    avgSOaccuracy += compWords / 50;
-                } */
-
-                Console.WriteLine($"Config = {change}");
-                Console.WriteLine($"Average FO accuracy = {avgFOaccuracy}");
-                //Console.WriteLine($"Average SO accuracy = {avgSOaccuracy}");
-
+                    Console.WriteLine($"Config = {change}");
+                    Console.WriteLine($"Average FO accuracy = {avgFOaccuracy}");
+                }
+                if (change % 1000 == 0)
+                {
+                    var numSeconds = DateTime.Now.Subtract(start).TotalSeconds;
+                    Console.WriteLine($"Time since start: {numSeconds} seconds");
+                    Console.WriteLine($"Avg time per test: {numSeconds / change} seconds");
+                }
                 if (avgFOaccuracy > mostAccurateFOValue)
                 {
                     mostAccurateFOValue = avgFOaccuracy;
                     mostAccurateFOConfig = change;
                 }
-
-                /* if (avgSOaccuracy > mostAccurateSOValue)
-                {
-                    mostAccurateSOValue = avgSOaccuracy;
-                    mostAccurateSOConfig = change;
-                } */
             }
 
         }
 
-        public static void LearnFirstWeights(List<List<string>> headlines, List<FOMarkov> firsts, double bias)
+        public static void LearnFirstWeights(SortedList<string, List<FOMarkov>> firstsSorted, List<FOMarkov> firsts, double bias)
         {
-            foreach (var pair in firsts)
+            //setup list initially
+            if (!_FirstWeightsCalculated)
             {
-                if (!_WeightCache.ContainsKey(pair))
-                {
-                    var temp = new Dictionary<wD, double>();
-                    foreach (var func in _Funcs)
-                    {
-                        temp[func.Key] = func.Key(pair.Next, pair.Base);
-                    }
-                    _WeightCache[pair] = temp;
-                }
-                pair.Weight = bias + _WeightCache[pair].Sum(x => x.Value * _Funcs[x.Key]);
+                CalculateFirstWeights(firsts);
+                _FirstWeightsCalculated = true;
             }
 
-            foreach (var g in firsts.GroupBy(x => x.Base))
+            List<double> funcsWeights = _Funcs.Values.ToList();
+            int max = funcsWeights.Count;
+
+            foreach (var pair in firsts)
+            {
+                pair.Weight = bias;
+                for (int i = 0; i < max; i++)
+                {
+                    pair.Weight += pair.Weights[i] * funcsWeights[i];
+                }
+            }
+
+            foreach (var g in firstsSorted.Values)
             {
                 var totalP = g.Sum(x => x.Count * x.Weight);
                 foreach (var i in g)
                     i.Probability = (double)i.Count * i.Weight / totalP;
+            }
+        }
+
+        public static void CalculateFirstWeights(List<FOMarkov> firsts)
+        {
+            foreach (var pair in firsts)
+            {
+                var temp = new List<double>();
+                foreach (var func in _Funcs)
+                {
+                    temp.Add(func.Key(pair.Next, pair.Base));
+                }
+                pair.Weights = temp;
             }
         }
 
@@ -153,11 +150,11 @@ namespace Markov
 
         public static void LearnWeights(List<List<string>> headlines, List<FOMarkov> firsts, List<SOMarkov> seconds, double bias)
         {
-            LearnFirstWeights(headlines, firsts, bias);
+            //LearnFirstWeights(headlines, firsts, bias);
             LearnSecondWeights(headlines, seconds, bias);
         }
 
-        public static string GenerateFOSentence(string firstWord, List<FOMarkov> firsts, int maxLength)
+        public static string GenerateFOSentence(string firstWord, SortedList<string, List<FOMarkov>> firsts, int maxLength)
         {
             Random rand = new Random();
 
@@ -166,8 +163,7 @@ namespace Markov
             for (int i = 1; i < maxLength; i++)
             {
                 double p = rand.NextDouble();
-                var poss = firsts.Where(x => x.Base == currentword).ToList();
-                if (poss.Count == 0)
+                if (!firsts.TryGetValue(currentword, out var poss))
                     break;
 
                 int j = 0;
@@ -182,11 +178,11 @@ namespace Markov
             return sentence;
         }
 
-        public static string GenerateSOSentence(string firstWord, List<SOMarkov> seconds, int maxLength)
+        public static string GenerateSOSentence(string firstWord, SortedList<string, List<SOMarkov>> seconds, int maxLength)
         {
             Random rand = new Random();
 
-            var potSec = seconds.Where(x => x.Base == firstWord).ToList();
+            var potSec = seconds[firstWord];
             string currentword = firstWord;
             string sentence = currentword;
             string secondWord = potSec[rand.Next(potSec.Count)].Base2;
@@ -195,7 +191,9 @@ namespace Markov
             for (int i = 2; i < maxLength; i++)
             {
                 double p = rand.NextDouble();
-                var poss = seconds.Where(x => x.Base == currentword && x.Base2 == secondWord).ToList();
+                if (!seconds.TryGetValue(currentword, out var poss))
+                    break;
+                poss = poss.Where(x => x.Base2 == secondWord).ToList();
                 if (poss.Count == 0)
                     break;
 
@@ -212,8 +210,8 @@ namespace Markov
             return sentence;
         }
 
-        public static void PrintTrainedSentences(string firstWord, List<FOMarkov> firsts, int maxLength) =>
-            Console.WriteLine(GenerateFOSentence(firstWord, firsts, maxLength));
+        public static void PrintTrainedSentences(string firstWord, SortedList<string, List<FOMarkov>> sortedFirsts, int maxLength) =>
+            Console.WriteLine(GenerateFOSentence(firstWord, sortedFirsts, maxLength));
 
     }
 

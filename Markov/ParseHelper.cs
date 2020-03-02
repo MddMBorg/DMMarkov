@@ -66,14 +66,14 @@ namespace Markov
             {
                 var totalP = g.Sum(x => x.Count * 1);
                 foreach (var i in g)
-                    i.Probability = (double)i.Count * i.Weight / totalP;
+                    i.Probability = (double)i.Count * 1 / totalP;
             }
 
             foreach (var g in links2.GroupBy(x => new { x.Base, x.Base2 }))
             {
                 var totalP = g.Sum(x => x.Count * 1);
                 foreach (var i in g)
-                    i.Probability = (double)i.Count * i.Weight / totalP;
+                    i.Probability = (double)i.Count * 1 / totalP;
             }
 
             _UpdateLinks1(links);
